@@ -16,7 +16,7 @@ html = f"""<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{{font-family:Outfit;src:url('{OUTFIT}')}}
 html,body{{margin:0;width:1280px;height:640px;overflow:hidden}}
 body{{background:#8b63f6;font-family:Outfit;color:#fff;position:relative}}
-.txt{{position:absolute;left:72px;top:0;bottom:0;width:440px;display:flex;flex-direction:column;justify-content:center}}
+.txt{{position:absolute;left:40px;top:0;bottom:0;width:480px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}}
 h1{{font-weight:600;font-size:92px;letter-spacing:-2px;margin:26px 0 0;line-height:1}}
 .frase{{font-size:32px;font-weight:500;margin:14px 0 0;opacity:.95}}
 .sub{{font-size:21px;font-weight:400;margin:30px 0 0;opacity:.82;line-height:1.45}}
