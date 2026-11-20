@@ -148,10 +148,44 @@ Nove fontes OFL comparadas com a mesma altura de maiúscula (`nome.png`).
 400 na frase), geradas por `gerar_assinatura.py`, com o texto convertido em
 desenho; espaçamento conferido contra a fonte no navegador.
 
+## Revisão do símbolo (19/11/2026) — disco de vinil
+
+O 森 da Yuji Mai no anel "ficou muito ruim no dia a dia": em 16–32 px os 12
+traços de pincel e o anel ondulado viram borrão, e o preto "não funciona,
+precisa de cor". Ele pediu algo "muito simples e clean", citando Monstercat,
+Riot, Discord e Steam (marcas de uma silhueta só).
+
+- **Leva 1** (`simples.py`, `simples.png`): três pinheiros, equalizador-floresta,
+  disco com pinheiro, 森 em fonte firme. Escolhido: **森 em fonte firme**
+  (Noto Sans JP 900), com algum sinal de música e com cor.
+- **Leva 2** (`simples2.py`): 森 só, 森 com ondas, 森 no disco, 音. Cores:
+  azul do Kosame `#1c5cb8` e roxo `#8b63f6`. Ele pediu "mais disco".
+- **Leva 3** (`simples3.py`): discos com sulcos, brilho e rótulo. Escolhido:
+  **disco com brilho**, pedindo textura de fios finos.
+- **Leva 4** (`simples4.py`): fios em três intensidades. **Escolhido: T3**
+  (fios mais abertos), **em roxo `#8b63f6`**.
+
+**Símbolo final:** disco de vinil de uma cor só; rótulo, fios e brilho são
+recortes por máscara, então o fundo aparece por eles. 森 em Noto Sans JP 900
+no rótulo. Arquivos gerados por `marca_disco.py`:
+`otomori-disco.svg` (com fios, 48 px para cima), `otomori-disco-pequeno.svg`
+(sem fios, 40 px para baixo, onde os fios viram só um tom),
+`otomori-assinatura.svg` (fonte do `Marca.svelte`) e, para o README,
+`assets/brand/otomori-assinatura-clara.svg` / `-escura.svg` (disco roxo).
+
+**Ícone:** disco branco num quadrado roxo arredondado (`gerar_icone.py` →
+`assets/brand/otomori.ico` e `crates/morune-desktop/icons/icon.ico`).
+**Capa do GitHub:** `assets/brand/otomori-capa-github.png` (1280×640, por
+`capa_github.py`); sobe à mão em Settings → Social preview, o GitHub não tem
+API para isso.
+
+**Substitui** o símbolo e a cor da seção abaixo. Nome, frase e Outfit seguem.
+No app, a marca continua seguindo a cor de destaque da pessoa.
+
 ## Marca decidida (02/11/2026)
 
 - **Nome:** Otomori. **Frase:** "O som fica. O peso não."
-- **Símbolo:** 森 da Yuji Mai dentro do anel que pulsa; do 24 px para cima,
+- **Símbolo (trocado em 19/11, ver acima):** 森 da Yuji Mai dentro do anel que pulsa; do 24 px para cima,
   completo; no 16 px, decidir no Windows entre anel sozinho e 森 maior.
 - **Cor:** preto (branco no escuro); no app, segue a cor de destaque da
   pessoa; roxo como destaque padrão. Sem carimbo.

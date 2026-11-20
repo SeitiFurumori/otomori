@@ -5,6 +5,14 @@ Versionamento semantico.
 
 ## [Nao lancado]
 
+### Mudado
+- **Simbolo novo: um disco de vinil roxo.** O 森 de pincel dentro do anel
+  virava borrao na barra de tarefas (16 a 32 px) e o preto se perdia. Agora e
+  um disco com o 森 no rotulo, fios de vinil e um brilho, num quadrado roxo
+  (`#8b63f6`). Vale para o icone do exe, do instalador e da bandeja, a marca na
+  lateral do app, os READMEs e a capa do repositorio. Do 40 px para baixo o
+  disco sai sem os fios, que nesse tamanho viram so um tom.
+
 ## [2.0.0] — Otomori
 
 O Morune passa a se chamar **Otomori** (音 som + 森 floresta): "O som fica. O

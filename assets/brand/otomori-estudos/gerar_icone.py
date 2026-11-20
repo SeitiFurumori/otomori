@@ -1,6 +1,6 @@
-"""Ícone do app (.ico): símbolo branco num quadrado escuro arredondado, que
-aparece na barra de tarefas clara e na escura. Do 24 px para cima, o símbolo
-completo; no 16 e no 20, só o anel (o 森 vira borrão nesse tamanho).
+"""Ícone do app (.ico): disco de vinil branco num quadrado roxo arredondado
+(marca de 19/11). Do 48 px para cima, com os fios do vinil; do 40 para baixo,
+sem fios (viram só um tom nesse tamanho).
 
 Uso: python gerar_icone.py <msedge.exe> <pasta-temporaria>"""
 import subprocess
@@ -12,7 +12,7 @@ from PIL import Image
 AQUI = Path(__file__).parent
 EDGE, TMP = sys.argv[1], Path(sys.argv[2])
 TMP.mkdir(parents=True, exist_ok=True)
-FUNDO, TINTA = "#16181d", "#f2f2f2"
+FUNDO, TINTA = "#8b63f6", "#ffffff"
 
 
 def foto(svg_arquivo: str, nome: str, escala: float) -> Image.Image:
@@ -31,11 +31,13 @@ def foto(svg_arquivo: str, nome: str, escala: float) -> Image.Image:
     return Image.open(png).convert("RGBA")
 
 
-completo = foto("otomori-simbolo.svg", "completo", 0.82)
-pequeno = foto("otomori-simbolo-pequeno.svg", "pequeno", 0.86)
+completo = foto("otomori-disco.svg", "completo", 0.84)
+pequeno = foto("otomori-disco-pequeno.svg", "pequeno", 0.86)
 tamanhos = [16, 20, 24, 32, 40, 48, 64, 128, 256]
-imagens = [(pequeno if t < 24 else completo).resize((t, t), Image.LANCZOS) for t in tamanhos]
+imagens = [(pequeno if t < 48 else completo).resize((t, t), Image.LANCZOS) for t in tamanhos]
 for destino in (AQUI.parents[2] / "crates/morune-desktop/icons/icon.ico", AQUI.parent / "otomori.ico"):
     imagens[-1].save(destino, format="ICO", sizes=[(t, t) for t in tamanhos], append_images=imagens[:-1])
 completo.resize((256, 256), Image.LANCZOS).save(AQUI / "png" / "otomori-icone-256.png")
+completo.resize((128, 128), Image.LANCZOS).save(AQUI.parent / "otomori-128.png")
+completo.save(AQUI / "png" / "otomori-icone-512.png")
 print("ok")
