@@ -5,6 +5,8 @@ Versionamento semantico.
 
 ## [Nao lancado]
 
+## [2.0.1] — Simbolo novo
+
 ### Mudado
 - **Simbolo novo: um disco de vinil roxo.** O 森 de pincel dentro do anel
   virava borrao na barra de tarefas (16 a 32 px) e o preto se perdia. Agora e
