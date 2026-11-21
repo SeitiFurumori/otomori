@@ -590,7 +590,11 @@ fn giro(app: &AppHandle) {
         if let Some(w) = app.get_webview_window("main") {
             let tint = m.state.taskbar_tint();
             if m.barra.is_none() && !m.barra_falhou {
-                match taskbar::TaskbarControls::new(&w, tint) {
+                let criada = w.hwnd().map_err(|e| e.to_string()).and_then(|h| {
+                    let hwnd = windows::Win32::Foundation::HWND(h.0);
+                    taskbar::TaskbarControls::new(hwnd, tint).map_err(|e| e.to_string())
+                });
+                match criada {
                     Ok(b) => m.barra = Some(b),
                     Err(error) => {
                         m.barra_falhou = true;
@@ -612,6 +616,8 @@ fn giro(app: &AppHandle) {
                 barra.set_tint(tint);
                 let (agora, tocando) = m.state.tray_status();
                 barra.update(agora.is_some(), tocando);
+                let capa = m.state.media_status().and_then(|s| s.cover);
+                barra.set_capa(capa.as_deref());
             }
         }
 

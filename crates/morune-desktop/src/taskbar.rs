@@ -4,13 +4,20 @@
 //! registrado uma vez e depois apenas atualizado; cliques chegam como
 //! `WM_COMMAND`. Toda a fronteira insegura Win32 fica confinada neste modulo.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use windows::core::w;
+use windows::core::{w, BOOL};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RPC_E_CHANGED_MODE, WPARAM};
+use windows::Win32::Graphics::Dwm::{
+    DwmInvalidateIconicBitmaps, DwmSetIconicThumbnail, DwmSetWindowAttribute,
+    DWMWA_FORCE_ICONIC_REPRESENTATION, DWMWA_HAS_ICONIC_BITMAP,
+};
+use windows::Win32::Graphics::Gdi::{
+    CreateDIBSection, DeleteObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
+};
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
     COINIT_APARTMENTTHREADED,
@@ -21,7 +28,7 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconFromResourceEx, DestroyIcon, RegisterWindowMessageW, HICON, LR_DEFAULTCOLOR,
-    WM_APPCOMMAND, WM_COMMAND,
+    WM_APPCOMMAND, WM_COMMAND, WM_DWMSENDICONICTHUMBNAIL,
 };
 
 const BUTTON_PREVIOUS: u32 = 0x4d01;
@@ -65,6 +72,9 @@ enum NativeEvent {
 struct SubclassState {
     sender: Sender<NativeEvent>,
     taskbar_button_created: u32,
+    /// Capa da faixa atual, ja decodificada. E o que aparece no lugar da
+    /// miniatura da janela quando o mouse para sobre o botao da barra.
+    capa: RefCell<Option<image::RgbaImage>>,
 }
 
 /// Inicializacao COM balanceada na mesma thread da interface.
@@ -158,19 +168,15 @@ pub struct TaskbarControls {
     subclass_state: *mut SubclassState,
     registered: Cell<bool>,
     last_shown: Cell<Option<(bool, bool)>>,
+    /// Arquivo da capa mostrada agora, para so decodificar quando muda.
+    capa_atual: Option<PathBuf>,
 }
 
 impl TaskbarControls {
-    pub fn new(window: &impl HasWindowHandle, tint: IconStyle) -> Result<Self, TaskbarError> {
-        let raw = window
-            .window_handle()
-            .map_err(TaskbarError::WindowHandle)?
-            .as_raw();
-        let RawWindowHandle::Win32(raw) = raw else {
-            return Err(TaskbarError::NotWin32);
-        };
-        let hwnd = HWND(raw.hwnd.get() as *mut c_void);
-
+    /// `hwnd` vem de `WebviewWindow::hwnd()`. Antes vinha do
+    /// `raw_window_handle`, que no Tauri responde "indisponivel" -- e o erro
+    /// desligava os botoes ate o app fechar (registro de 08/11 em diante).
+    pub fn new(hwnd: HWND, tint: IconStyle) -> Result<Self, TaskbarError> {
         let apartment = ComApartment::initialize()?;
         // SAFETY: COM esta inicializado na thread atual e TaskbarList e uma
         // coclasse do sistema usada sem agregacao.
@@ -190,6 +196,7 @@ impl TaskbarControls {
         let subclass_state = Box::into_raw(Box::new(SubclassState {
             sender,
             taskbar_button_created,
+            capa: RefCell::new(None),
         }));
         // SAFETY: `subclass_state` permanece alocado ate Drop, quando o callback
         // e removido antes de o Box ser reconstruido.
@@ -218,9 +225,44 @@ impl TaskbarControls {
             tint: Cell::new(tint),
             registered: Cell::new(false),
             last_shown: Cell::new(None),
+            capa_atual: None,
         };
+        // A miniatura ao vivo da janela sai; no lugar dela o Windows pede um
+        // quadro (WM_DWMSENDICONICTHUMBNAIL), e respondemos com a capa.
+        let sim = BOOL(1);
+        for atributo in [DWMWA_FORCE_ICONIC_REPRESENTATION, DWMWA_HAS_ICONIC_BITMAP] {
+            // SAFETY: HWND vivo; o valor e um BOOL lido durante a chamada.
+            let _ = unsafe {
+                DwmSetWindowAttribute(
+                    hwnd,
+                    atributo,
+                    &sim as *const BOOL as *const c_void,
+                    std::mem::size_of::<BOOL>() as u32,
+                )
+            };
+        }
         controls.update(false, false);
         Ok(controls)
+    }
+
+    /// Troca a capa mostrada no lugar da miniatura. So decodifica quando o
+    /// arquivo muda; sem capa, o quadro fica vazio.
+    pub fn set_capa(&mut self, caminho: Option<&Path>) {
+        if self.capa_atual.as_deref() == caminho {
+            return;
+        }
+        self.capa_atual = caminho.map(Path::to_path_buf);
+        let imagem = caminho.and_then(|p| match image::open(p) {
+            Ok(img) => Some(img.thumbnail(512, 512).to_rgba8()),
+            Err(error) => {
+                tracing::debug!(%error, "capa da barra de tarefas nao abriu");
+                None
+            }
+        });
+        // SAFETY: o estado vive ate Drop; o callback roda nesta mesma thread.
+        unsafe { *(*self.subclass_state).capa.borrow_mut() = imagem };
+        // SAFETY: HWND vivo da janela; so avisa o DWM para pedir de novo.
+        let _ = unsafe { DwmInvalidateIconicBitmaps(self.hwnd) };
     }
 
     /// Le cliques sem bloquear a thread da interface.
@@ -376,6 +418,12 @@ unsafe extern "system" fn window_subclass(
                 let _ = state.sender.send(NativeEvent::Command(command));
             }
         }
+    } else if message == WM_DWMSENDICONICTHUMBNAIL {
+        // lparam: largura maxima na palavra alta, altura na baixa.
+        let max_w = ((lparam.0 >> 16) & 0xffff) as u32;
+        let max_h = (lparam.0 & 0xffff) as u32;
+        enviar_capa(hwnd, &state.capa.borrow(), max_w, max_h);
+        return LRESULT(0);
     } else if message == state.taskbar_button_created {
         // O Explorer pode reiniciar; nesse caso o conjunto inteiro precisa ser
         // adicionado novamente, com os mesmos ids.
@@ -384,6 +432,60 @@ unsafe extern "system" fn window_subclass(
 
     // SAFETY: encaminha toda mensagem para a proxima funcao da cadeia Win32.
     unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
+}
+
+/// Entrega ao DWM a capa reduzida para caber em `max_w` x `max_h`.
+fn enviar_capa(hwnd: HWND, capa: &Option<image::RgbaImage>, max_w: u32, max_h: u32) {
+    if max_w == 0 || max_h == 0 {
+        return;
+    }
+    let lado = max_w.min(max_h);
+    let quadro = match capa {
+        Some(img) => {
+            image::imageops::resize(img, lado, lado, image::imageops::FilterType::Lanczos3)
+        }
+        // Sem faixa: quadro transparente, e nao a janela.
+        None => image::RgbaImage::new(lado, lado),
+    };
+    let (w, h) = quadro.dimensions();
+    let info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: w as i32,
+            // Negativo: linhas de cima para baixo, na ordem da imagem.
+            biHeight: -(h as i32),
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut bits: *mut c_void = std::ptr::null_mut();
+    // SAFETY: cabecalho valido; o DIB e liberado com DeleteObject abaixo.
+    let Ok(bitmap) = (unsafe { CreateDIBSection(None, &info, DIB_RGB_COLORS, &mut bits, None, 0) })
+    else {
+        return;
+    };
+    if !bits.is_null() {
+        // SAFETY: CreateDIBSection reservou w*h*4 bytes em `bits`.
+        let destino =
+            unsafe { std::slice::from_raw_parts_mut(bits as *mut u8, (w * h * 4) as usize) };
+        for (d, p) in destino.chunks_exact_mut(4).zip(quadro.pixels()) {
+            let a = p[3] as u32;
+            // BGRA com alfa pre-multiplicado, como o DWM espera.
+            d[0] = (p[2] as u32 * a / 255) as u8;
+            d[1] = (p[1] as u32 * a / 255) as u8;
+            d[2] = (p[0] as u32 * a / 255) as u8;
+            d[3] = p[3];
+        }
+        // SAFETY: HWND vivo e bitmap valido; o DWM copia antes de voltar.
+        if let Err(error) = unsafe { DwmSetIconicThumbnail(hwnd, bitmap, 0) } {
+            tracing::debug!(%error, "DWM recusou a capa da miniatura");
+        }
+    }
+    // SAFETY: o bitmap e nosso e o DWM ja copiou.
+    let _ = unsafe { DeleteObject(bitmap.into()) };
 }
 
 fn button(
@@ -672,10 +774,6 @@ fn write_i32(target: &mut [u8], offset: usize, value: i32) {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TaskbarError {
-    #[error("janela nao expoe um handle Win32")]
-    NotWin32,
-    #[error("handle da janela: {0}")]
-    WindowHandle(raw_window_handle::HandleError),
     #[error("Windows: {0}")]
     Windows(#[from] windows::core::Error),
     #[error("Windows nao registrou TaskbarButtonCreated")]
