@@ -219,6 +219,23 @@ pub trait Library: Send + Sync + 'static {
         Box::pin(async { Err(CoreError::Unsupported("estado das musicas curtidas")) })
     }
 
+    /// Os mesmos ids de [`Library::saved_track_ids`], cada um com o instante
+    /// em que foi curtido (segundos desde 1970; 0 quando o provedor nao diz).
+    ///
+    /// Serve a ordem propria das curtidas: uma faixa descurtida e curtida de
+    /// novo em outro aparelho volta com o mesmo id, e so a data diz que ela e
+    /// nova.
+    fn saved_track_dates<'a>(&'a self) -> BoxFuture<'a, CoreResult<Vec<(TrackId, u64)>>> {
+        Box::pin(async move {
+            Ok(self
+                .saved_track_ids()
+                .await?
+                .into_iter()
+                .map(|id| (id, 0))
+                .collect())
+        })
+    }
+
     /// Metadado de varias faixas, na ordem dos ids. Faixa que o provedor nao
     /// devolver fica de fora.
     ///

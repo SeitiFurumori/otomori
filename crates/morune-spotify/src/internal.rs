@@ -444,6 +444,23 @@ impl Internal {
     /// e o que "Musicas curtidas" significa em qualquer player. Item sem data
     /// vai para o fim, em vez de disputar o topo com um zero.
     pub(crate) async fn collection(&self, conjunto: Conjunto) -> CoreResult<Vec<String>> {
+        Ok(self
+            .collection_com_datas(conjunto)
+            .await?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect())
+    }
+
+    /// O mesmo que [`Self::collection`], com a data em que cada item entrou
+    /// (segundos desde 1970, como o servidor manda).
+    ///
+    /// A data e o que separa uma curtida antiga de uma **refeita**: descurtir
+    /// e curtir de novo no celular devolve o mesmo id, so a data muda.
+    pub(crate) async fn collection_com_datas(
+        &self,
+        conjunto: Conjunto,
+    ) -> CoreResult<Vec<(String, u64)>> {
         let session = self.session.get().ok_or(CoreError::NotAuthenticated)?;
         let usuario = session.username();
 
@@ -467,7 +484,7 @@ impl Internal {
         // isto a tela mostra uma fatia arbitraria da colecao.
         itens.sort_by_key(|(_, quando)| std::cmp::Reverse(*quando));
 
-        Ok(itens.into_iter().map(|(id, _)| id).collect())
+        Ok(itens)
     }
     /// Album completo pelo protocolo interno: capa, artistas, data e faixas.
     ///

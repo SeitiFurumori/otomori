@@ -410,7 +410,7 @@ impl Browse {
         self.handle.spawn(async move {
             let mut atuais = trava(&ordem).conhecidas().to_vec();
             if atuais.is_empty() {
-                atuais = match library.saved_track_ids().await {
+                atuais = match library.saved_track_dates().await {
                     Ok(ids) => ids,
                     Err(error) => {
                         tracing::warn!(%error, "sem a lista de curtidas; ordem nao gravada");
@@ -871,10 +871,10 @@ impl Browse {
                 Ok(page) => home.liked = page.items,
                 Err(e) => failure = note(failure, &e, "musicas curtidas"),
             }
-            match library.saved_track_ids().await {
-                Ok(ids) => {
-                    trava(&ordem).lembrar(&ids);
-                    home.liked_ids = ids;
+            match library.saved_track_dates().await {
+                Ok(curtidas) => {
+                    trava(&ordem).lembrar(&curtidas);
+                    home.liked_ids = curtidas.into_iter().map(|(id, _)| id).collect();
                 }
                 Err(e) => failure = note(failure, &e, "estado das curtidas"),
             }
@@ -1032,7 +1032,7 @@ async fn curtidas(
     if trava(ordem).vazia() {
         return library.saved_tracks(offset, limit).await;
     }
-    let atuais = library.saved_track_ids().await?;
+    let atuais = library.saved_track_dates().await?;
     let ids = {
         let mut ordem = trava(ordem);
         ordem.lembrar(&atuais);

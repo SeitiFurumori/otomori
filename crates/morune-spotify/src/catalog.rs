@@ -450,6 +450,18 @@ impl Library for SpotifyCatalog {
         })
     }
 
+    fn saved_track_dates<'a>(&'a self) -> BoxFuture<'a, CoreResult<Vec<(TrackId, u64)>>> {
+        Box::pin(async move {
+            Ok(self
+                .internal
+                .collection_com_datas(Conjunto::Faixas)
+                .await?
+                .into_iter()
+                .map(|(id, quando)| (TrackId::spotify(id), quando))
+                .collect())
+        })
+    }
+
     fn tracks_by_ids<'a>(&'a self, ids: &'a [TrackId]) -> BoxFuture<'a, CoreResult<Vec<Track>>> {
         Box::pin(async move {
             let crus: Vec<String> = ids
