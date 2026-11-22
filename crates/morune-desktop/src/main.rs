@@ -252,6 +252,10 @@ fn abrir_janela(app: &AppHandle) {
         m.enviado.clear();
         // Janela nova nasce sem efeito: o material e reaplicado.
         m.material_pedido = None;
+        // Os botoes da barra sao da janela antiga (podem ter sido criados
+        // enquanto ela fechava): a nova recebe os seus no proximo giro.
+        m.barra = None;
+        m.barra_falhou = false;
     });
 }
 
@@ -299,6 +303,7 @@ fn tratar_evento_janela(app: &AppHandle, evento: &WindowEvent) {
                 m.tema_enviado = Value::Null;
                 // A janela volta sempre no tamanho normal.
                 m.mini_antes = None;
+                m.barra = None;
                 m.janela.set_mini_player(false);
                 m.janela.set_mini_fixo(false);
             });
@@ -590,13 +595,19 @@ fn giro(app: &AppHandle) {
         if let Some(w) = app.get_webview_window("main") {
             let tint = m.state.taskbar_tint();
             if m.barra.is_none() && !m.barra_falhou {
-                let criada = w.hwnd().map_err(|e| e.to_string()).and_then(|h| {
+                // Janela ainda nascendo ou ja fechando: sem HWND agora, tenta
+                // no proximo giro. Desistir aqui desligava os botoes de vez.
+                let criada = w.hwnd().ok().map(|h| {
                     let hwnd = windows::Win32::Foundation::HWND(h.0);
-                    taskbar::TaskbarControls::new(hwnd, tint).map_err(|e| e.to_string())
+                    taskbar::TaskbarControls::new(hwnd, tint)
                 });
                 match criada {
-                    Ok(b) => m.barra = Some(b),
-                    Err(error) => {
+                    None => {}
+                    Some(Ok(b)) => {
+                        tracing::info!("botoes da barra de tarefas ligados");
+                        m.barra = Some(b);
+                    }
+                    Some(Err(error)) => {
                         m.barra_falhou = true;
                         tracing::warn!(%error, "controles da barra de tarefas indisponiveis");
                     }
