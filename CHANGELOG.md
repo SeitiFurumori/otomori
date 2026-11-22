@@ -5,6 +5,17 @@ Versionamento semantico.
 
 ## [Nao lancado]
 
+## [2.0.2] — Curtidas e barra de tarefas
+
+### Corrigido
+- **Curtida refeita em outro aparelho volta ao topo.** Quem ja tinha arrastado
+  as curtidas e descurtia e curtia de novo uma musica no celular nao a via no
+  topo: ela ficava no lugar antigo da ordem (uma delas na 371a de 727) e
+  parecia ter sumido. Agora conta a data da curtida.
+- **Botoes da miniatura na barra de tarefas** (anterior, tocar, proxima)
+  deixavam de aparecer de vez; agora voltam, e a miniatura mostra a capa da
+  faixa atual no lugar da previa da janela.
+
 ## [2.0.1] — Simbolo novo
 
 ### Mudado
